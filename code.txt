@@ -1,0 +1,349 @@
+#Importing nesessary library 
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore")
+
+data =pd.read_csv('C:/Users/shafqat Ali/Downloads/ifood_df.csv')
+data.head()
+data.columns
+data.info()
+data.isnull().sum()
+data.duplicated().sum()
+data.drop_duplicates(inplace=True)
+data.duplicated().sum()
+data.nunique()
+#Columns Z_CostContact and Z_Revenue have all the same values. These columns will not help us to understand our customers better. We can drop these columns from the data frame.
+data.drop(columns=['Z_CostContact','Z_Revenue'],inplace=True)
+#Data Exploration
+sns.boxplot(data=data, y='MntTotal')
+plt.title('Box Plot for MntTotal')
+plt.ylabel('MntTotal')
+plt.show()
+
+Handling Outliers
+Calulate the first quartile (Q1) and the third quartile(Q3)
+
+Q1 = data['MntTotal'].quantile(0.25)
+Q3 = data['MntTotal'].quantile(0.75)
+# calculate the Interquartile Range (IQR)
+IQR = Q3 - Q1
+# Define the lower and upper bounds for detecting outlieers
+lower_bound = Q1 - 1.5*IQR
+upper_bound = Q3 + 1.5*IQR
+outliers = data[(data['MntTotal'] < lower_bound) | (data['MntTotal'] > upper_bound)]
+outliers.head()
+data = data[(data['MntTotal'] > lower_bound) & (data['MntTotal'] < upper_bound)]
+sns.boxplot(data=data, y='MntTotal')
+plt.title('Box Plot for MntTotal')
+plt.ylabel('MntTotal')
+plt.show()
+
+sns.boxplot(data=data, y='Income', palette='viridis')
+plt.title('Box Plot for Income')
+plt.ylabel('Income')
+plt.show()
+There is No outliers in income column
+sns.histplot(data=data, x='Income', bins=30, kde=True)
+plt.title('Histogram for Income')
+plt.xlabel('Income')
+plt.ylabel('Frequency')
+plt.show()
+print("Skewness: %f" % data['Income'].skew())
+print("Kurtosis: %f" % data['Income'].kurt())
+the income distribution is nearly symmetrical, This means that income variability is more evenly spread without extreme highs or lows.
+
+sns.histplot(data=data, x='Age', bins=30, kde=True)
+plt.title('Histogram for Age')
+plt.xlabel('Age')
+plt.ylabel('Frequency')
+plt.show()
+print("Skewness: %f" % data['Age'].skew())
+print("Kurtosis: %f" % data['Age'].kurt())
+The age distribution is nearly symmetrical. A platykurtic suggests fewer  extreme ages , customers are more spread across ages, groups rather than clustered around very  young or very old customers.
+
+print("Skewness for NumDeal: %f" % data['NumDealsPurchases'].skew())
+print("Kurtosis for NumDeal: %f" % data['NumDealsPurchases'].kurt())
+print("Skewness for NumWeb: %f" % data['NumWebPurchases'].skew())
+print("Kurtosis for NumWeb: %f" % data['NumWebPurchases'].kurt())
+print("Skewness for NumCatalog: %f" % data['NumCatalogPurchases'].skew())
+print("Kurtosis for NumCatalog: %f" % data['NumCatalogPurchases'].kurt())
+print("Skewness for NumStore: %f" % data['NumStorePurchases'].skew())
+print("Kurtosis for NumStore: %f" % data['NumStorePurchases'].kurt())
+print("Skewness for NumWebVisits: %f" % data['NumWebVisitsMonth'].skew())
+print("Kurtosis for NumWebVisits: %f" % data['NumWebVisitsMonth'].kurt())
+
+- NumDeal has a high positive skewness (2.33) and extreme kurtosis (8.38), suggesting a strongly right-skewed distribution with heavy    tails—indicating occasional extreme values.
+- NumWeb and NumCatalog also show right-skewed distributions with moderate kurtosis, meaning they have relatively frequent extreme values.
+- NumStore has a slight positive skew (0.71) but a negative kurtosis (-0.61), indicating a flatter distribution with light tails—suggesting fewer extreme values.
+- NumWebVisits is close to symmetric (0.28 skewness) with moderate kurtosis (2.11), implying a fairly normal distribution with mild tail weight.
+
+
+#Correlation matrix
+cols_demographics = ['Income','Age']
+cols_children = ['Kidhome', 'Teenhome']
+cols_marital = ['marital_Divorced', 'marital_Married','marital_Single', 'marital_Together', 'marital_Widow']
+cols_mnt = ['MntTotal', 'MntRegularProds','MntWines', 'MntFruits', 'MntMeatProducts', 'MntFishProducts', 'MntSweetProducts', 'MntGoldProds']
+cols_communication = ['Complain', 'Response', 'Customer_Days']
+cols_campaigns = ['AcceptedCmpOverall', 'AcceptedCmp1', 'AcceptedCmp2', 'AcceptedCmp3', 'AcceptedCmp4', 'AcceptedCmp5']
+cols_source_of_purchase = ['NumDealsPurchases', 'NumWebPurchases','NumCatalogPurchases', 'NumStorePurchases', 'NumWebVisitsMonth']
+cols_education = ['education_2n Cycle', 'education_Basic', 'education_Graduation', 'education_Master', 'education_PhD']
+corr_matrix = data[['MntTotal']+cols_demographics+cols_source_of_purchase].corr()
+plt.figure(figsize=(6,6))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', linewidths=0.5)
+plt.title('Correlation Matrix Heatmap')
+plt.show()
+- MntTotal has strongly positive relation with Income,NumStorePurchases,NumCatalogPurchases.
+intermediate positive relation with NumWebPurchases,intermediate negative relation with NumWebVisitsMonth and weak negative relation with NumDealsPurchases.
+- NumWebVisitsMonth has weak negative relation with NumWebPurchases.
+- 
+
+# Feature engineering
+data['TotalPurchases'] = data['NumWebPurchases'] + data['NumCatalogPurchases'] + data['NumStorePurchases']
+data['OnlinePurchaseRatio']= data['NumWebPurchases'] / (data['TotalPurchases'] + 1e-5)
+data['MntFood'] = data['MntWines'] + data['MntFruits'] + data['MntMeatProducts'] + data['MntFishProducts'] + data['MntSweetProducts']
+data['MntNonFood'] = data['MntGoldProds']
+data['AvgSpendPerPurchase'] = data['MntTotal'] / (data['TotalPurchases'] + 1e-5)
+
+# Feature engineering
+def get_Purchases(row):
+    if row['NumWebPurchases'] == 1:
+        return 'WebPurchases'
+    elif row['NumCatalogPurchases'] == 1:
+        return 'CatalogPurchases'
+    elif row['NumStorePurchases'] == 1:
+        return 'StorePurchases'
+    else:
+        return 'DealsPurchases'
+data['TotalPurchases'] = data.apply(get_Purchases, axis=1)
+plt.figure(figsize=(8, 6))
+sns.barplot(x='TotalPurchases', y='NumWebVisitsMonth', data=data, palette='viridis')
+plt.title('TotalPurchases by NumWebVisitsMonth')
+plt.xlabel('TotalPurchases')
+plt.ylabel('NumWebVisitsMonth')
+
+plt.figure(figsize=(8, 6))
+sns.barplot(x='TotalPurchases', y='Age', data=data, palette='viridis')
+plt.title(' TotalPurchases by Age')
+plt.xlabel('TotalPurchases')
+plt.ylabel('Age')
+
+
+plt.figure(figsize=(8, 6))
+sns.barplot(x='TotalPurchases', y='Income', data=data, palette='viridis')
+plt.title('TotalPurchases by Income')
+plt.xlabel('TotalPurchases')
+plt.ylabel('Income')
+# Selected features for clustering
+features = [
+    'Income', 'Age', 'MntTotal','Recency',
+    'NumDealsPurchases', 'NumCatalogPurchases', 'NumStorePurchases',
+    'NumWebVisitsMonth', 'TotalPurchases', 'OnlinePurchaseRatio',
+    'MntFood', 'MntNonFood', 'AvgSpendPerPurchase'
+]
+
+df_seg = data[features].dropna()
+
+df_seg 
+K-Means Clustering
+
+K-means clustering is an unsupervised machine learning algorithm used to cluster data based on similarity. K-means clustering usually works well in practice and scales well to the large datasets.
+
+In this section:
+
+- Standardising data
+- Principal Component Analysis (PCA)
+- Elbow method
+- Silhouette score analysis
+from sklearn.cluster import KMeans
+
+Standardising data
+
+K-means clustering algorithm is based on the calculation of distances between data points to form clusters. 
+When features have different scales, features with larger scales can disproportionately influence the distance calculation. 
+There are various ways to standardise features, we will use standard scaling .
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+df_seg  = [
+   'Income', 'Age', 'MntTotal','Recency',
+    'NumDealsPurchases', 'NumCatalogPurchases', 'NumStorePurchases',
+    'NumWebVisitsMonth', 'OnlinePurchaseRatio',
+    'MntFood', 'MntNonFood', 'AvgSpendPerPurchase'
+]
+
+data_scaled = data.copy()
+data_scaled[df_seg ]= scaler.fit_transform(data[df_seg ])
+
+data_scaled[df_seg ]
+data_scaled[df_seg ].describe().transpose()
+The mean value for all colums is almost zero and the standard deviation is almost 1. All the data points were replaced by their z-scores.
+Principal Component Analysis (PCA)
+- PCA is a technique of dimensionality reduction. 
+- PCA takes the original features (dimensions) and create new features that capture the most variance of the data.
+from sklearn import decomposition
+pca = decomposition.PCA(n_components = 2)
+pca_res = pca.fit_transform(data_scaled[df_seg])
+data_scaled['pc1'] = pca_res[:,0]
+data_scaled['pc2'] = pca_res[:,1]
+X = data_scaled[df_seg ]
+inertia_list = []
+for K in range(2,10):
+    inertia = KMeans(n_clusters=K, random_state=7).fit(X).inertia_
+    inertia_list.append(inertia)
+inertia_list
+plt.figure(figsize=[7,5])
+plt.plot(range(2,10), inertia_list, color=(54 / 255, 113 / 255, 130 / 255))
+plt.title("Inertia vs. Number of Clusters")
+plt.xlabel("Number of Clusters (K)")
+plt.ylabel("Inertia")
+plt.show()
+
+Elbow method suggests 4 or 5 clusters. Let's check silhouette score.
+
+
+Silhouette score analysis
+Silhouette score is a metric that used to assess the quality of clustering. 
+A higher silhouette score indicates that the clusters are well-separated, while a lower score suggests that the clusters may overlap or are poorly defined.
+from sklearn.metrics import silhouette_score
+silhouette_list = []
+for K in range(2,10):
+    model = KMeans(n_clusters = K, random_state=7)
+    clusters = model.fit_predict(X)
+    s_avg = silhouette_score(X, clusters)
+    silhouette_list.append(s_avg)
+
+plt.figure(figsize=[7,5])
+plt.plot(range(2,10), silhouette_list, color=(54 / 255, 113 / 255, 130 / 255))
+plt.title("Silhouette Score vs. Number of Clusters")
+plt.xlabel("Number of Clusters (K)")
+plt.ylabel("Silhouette Score")
+plt.show()
+From the plot, the silhouette score appears to peak around k = 2 or 3 well-defined cluster.
+model = KMeans(n_clusters=3, random_state = 7)
+model.fit(data_scaled[df_seg ])
+data_scaled['Cluster'] = model.predict(data_scaled[df_seg ])
+Exploration of Clusters
+- In this section:
+
+- Visualisation of clusters
+- Mean consumption of different product types by cluster
+- Cluster sizes
+- TotalPurchases by cluster
+- OnlinePurchaseRatio feature by cluster
+- Age by cluster
+- AvgSpendPerPurchase by cluster
+Visualisation of clusters
+
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x='pc1', y='pc2', data=data_scaled, hue='Cluster', palette='viridis')
+plt.title('Clustered Data Visualization')
+plt.xlabel('Principal Component 1 (pc1)')
+plt.ylabel('Principal Component 2 (pc2)')
+plt.legend(title='Clusters')
+data['Cluster'] = data_scaled.Cluster
+data.groupby('Cluster')[df_seg].mean()
+Mean consumption of different Purchases behavior by cluster
+
+data['Cluster'] = data_scaled.Cluster
+Purch_data = data.groupby('Cluster')[cols_source_of_purchase].mean().reset_index()
+Purch_data.head()
+melted_data = pd.melt(Purch_data , id_vars="Cluster", var_name="Purchases", value_name="Type")
+plt.figure(figsize=(12, 6))
+sns.barplot(x="Cluster", y="Type", hue="Purchases", data=melted_data, ci=None, palette="viridis")
+plt.title("Purchases by Cluster")
+plt.xlabel("Cluster")
+plt.ylabel("Purchases")
+plt.xticks(rotation=0)  
+plt.legend(title="Purchases", loc="upper right")
+
+plt.show()
+
+cluster_sizes
+cluster_sizes = data.groupby('Cluster')[['TotalPurchases']].count().reset_index()
+plt.figure(figsize=(8,6))
+sns.barplot(x='Cluster', y='TotalPurchases', data=cluster_sizes, palette = 'viridis')
+plt.title('Cluster sizes')
+plt.xlabel('Cluster')
+plt.ylabel('TotalPurchases')
+total_rows = len(data)
+cluster_sizes['Share%'] = round(cluster_sizes['TotalPurchases']/ total_rows*100,0)
+cluster_sizes.head()
+Age by cluster
+plt.figure(figsize=(8, 6))
+sns.barplot(x='Cluster', y='Age', data=data, palette='viridis')
+plt.title('Age by cluster')
+plt.xlabel('Cluster')
+plt.ylabel('Age')
+OnlinePurchaseRatio by Cluster
+
+plt.figure(figsize=(8, 6))
+sns.barplot(x='Cluster', y='OnlinePurchaseRatio', data=data, palette='viridis')
+plt.title('OnlinePurchaseRatio by cluster')
+plt.xlabel('Cluster')
+plt.ylabel('OnlinePurchaseRatio')
+AvgSpendPerPurchase by cluster
+plt.figure(figsize=(8, 6))
+sns.barplot(x='Cluster', y='AvgSpendPerPurchase', data=data, palette='viridis')
+plt.title('AvgSpendPerPurchase by cluster')
+plt.xlabel('Cluster')
+plt.ylabel('AvgSpendPerPurchase')
+Results
+- This section contains the results of the K-means clustering analysis, which aimed to identify distinct customer segments based on the total of purchases they made (TotalPurchases). 
+- The analysis identify distinct customer segments based on behavioral, demographic, and transactional features.
+
+Optimal number of clusters = 3
+The Elbow Method and Silhouette Analysis suggested 3 clusters (k=3).
+- The elbow method highlighted the number of 4 or 5 clusters as a reasonable number of clusters.
+- The silhouette score analysis revealed a peak silhouette score for k=3.
+
+Cluster Characteristics.
+
+Cluster 0: 
+- Prefers in-store purchases, low digital and transaction activity.
+- Slightly younger profiles, possibly more exploratory or discount-driven.
+- Lowest digital engagement—likely traditional or less responsive to online channels.
+- Average Spend Per Purchase shows  Lowest across all metrics—needs intervention.
+
+Cluster 1:
+- High digital engagement and spending, leading in web and deal-based purchases.
+- Leads in both web visits and online purchase ratio—digital-first consumers.
+- Slightly younger profiles, possibly more exploratory or discount-driven.
+- Highest spend per transaction—premium buyers.
+
+Cluster 2:
+- Higher average age—likely loyal and consistent buyers.
+- Represents the bulk of total purchases (45%), with moderate activity but strong value.
+- Balanced behavior, room to increase online activity.
+- Moderate spend, high volume.
+
+Recommendations:
+
+Cluster 0 – Low Engagement Segment
+- The target: Reactivate or convert to higher value.
+- Recommendations:
+- Launch in-store loyalty or bundle promotions.
+- Use personalized offline communication and onboarding messages.
+- Introduce introductory online offers to drive digital adoption.
+
+Cluster 1 – High-Value Digital Shoppers
+- The target: Retain and reward.
+- Recommendations:
+- Target with premium product launches and online exclusives.
+- Offer tiered digital loyalty programs or VIP perks.
+
+Cluster 2 – Core Growth Group
+- The target: Maximize potential and encourage gradual upscaling.
+- Recommendations:
+- Promote personalized cross-sell bundles.
+- Use behavioral nudges: email reminders, curated picks.
+- Introduce tier-based rewards to boost average spend.
+
+
+
+
+
+
+
+Thank you
